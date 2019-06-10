@@ -1,6 +1,8 @@
 #include<bits/stdc++.h>
 using namespace std;
 
+
+// table to convert 64 bit key into 56 bit key generator.
 int key_parity_drop[56]=  
     {   57,49,41,33,25,17,9, 
         1,58,50,42,34,26,18, 
@@ -11,6 +13,10 @@ int key_parity_drop[56]=
         14,6,61,53,45,37,29, 
         21,13,5,28,20,12,4 
     };
+
+// table to keep track of how many places key
+// has to be shifted in each of the 16 rounds 
+// of DES
 int key_shift_in_each_round[16]= 
     {   1, 1, 2, 2, 
         2, 2, 2, 2,  
@@ -18,6 +24,8 @@ int key_shift_in_each_round[16]=
         2, 2, 2, 1 
     };
 
+// table to convert 56 bit key generator into 
+// key for each round
 int compressed_key[48]= 
     {   14,17,11,24,1,5, 
         3,28,15,6,21,10, 
@@ -29,9 +37,12 @@ int compressed_key[48]=
         46,42,50,36,29,32 
     };
 
+// the following two vectors store all the 16 keys
+// used in binary and hexadecimal format respectively
 vector<string> binary_keys;
 vector<string> hexa_keys;
 
+// function to xor two binary strings
 string xor_func(string s1, string s2){
     string result="";
     for(int i=0;i<s1.size();i++){
@@ -42,6 +53,7 @@ string xor_func(string s1, string s2){
 
 }
 
+// convert hexadecimal string to binary
 string convertToBinary(string s){
     string result = "";
     for(int i=0;i<s.size();i++){
@@ -66,6 +78,7 @@ string convertToBinary(string s){
     return result;
 }
 
+// convert binary string to hexadecimal
 string convertToHexadecimal(string s){
     string result = "";
     for(int i=0;i<s.size();i+=4){
@@ -94,6 +107,7 @@ string convertToHexadecimal(string s){
     return result;
 }
 
+// change one string into another based on the parity_table argument passed
 string permuteString(string key,int* parity_table, int n){
     string result = "";
     for(int i=0;i<n;i++){
@@ -102,6 +116,7 @@ string permuteString(string key,int* parity_table, int n){
     return result;
 }
 
+// shift string num_shifts unit to left
 string shift_left(string s, int num_shifts){
     
     for(int i=0;i<num_shifts;i++){
@@ -115,6 +130,23 @@ string shift_left(string s, int num_shifts){
     return s;
 }
 
+/*  function used to both encrypt and decrypt
+    text since encryption and decryption follow same
+    steps (only keys are used opposite order) 
+ */ 
+
+/*  The steps are - 
+    1. initial permutation is applied 
+    2. plain text is divided into two equal parts - 'left' and 'right'
+    Now repeat the following 16 times -  
+        3. expand right part from 32 bits to 48 bits.
+        4. now xor this with the ith key.
+        5. apply s-box
+        6. apply p-box
+        7. xor result with left and put left equal to this
+        8. swap left and right
+    9. recombine left and right and apply inverse permutation 
+*/
 string encrypt(string plain_text){
     plain_text = convertToBinary(plain_text);
 
@@ -138,7 +170,7 @@ string encrypt(string plain_text){
     for(int i=32;i<64;i++){
         right.push_back(plain_text[i]);
     }
-
+    // table to expand right from 32 to 48 bits.
     int right_expansion_permutation[48]=  
     {   32,1,2,3,4,5,4,5, 
         6,7,8,9,8,9,10,11, 
@@ -147,6 +179,7 @@ string encrypt(string plain_text){
         22,23,24,25,24,25,26,27, 
         28,29,28,29,30,31,32,1 
     }; 
+
 
     int s_box[8][4][16]= 
     {{ 
@@ -211,11 +244,14 @@ string encrypt(string plain_text){
         22,11,4,25 
     }; 
 
+    // 16 cycle DES applied
     for(int i=0;i<16;i++){
         string expanded_right = permuteString(right, right_expansion_permutation, 48);
 
         string x = xor_func(expanded_right,binary_keys[i]);
         string temp = "";
+
+        // S-box applied
         for(int i=0;i<8;i++){
             int num1 = 2*int(x[i*6]-'0')+int(x[i*6+5]-'0');
             int num2 = 8*int(x[i*6 + 1]-'0') + 4*int(x[i*6+2]-'0') + 2*int(x[i*6+3]-'0')+int(x[i*6+4]-'0');
@@ -256,14 +292,15 @@ string encrypt(string plain_text){
 }
 
 int main(){
-    string key = "AABB09182736CCDD";
-    string plain_text = "123456ABCD132536";
+    string key = "AABBCCDDEEFF0011";
+    string plain_text = "1234567890ABCDEF";
     //cout<<sizeof(plain_text);
     key = convertToBinary(key);
 
-    
+    // make key generator
     key = permuteString(key,key_parity_drop,56); 
     
+    // divide into two parts of 28 bits each
     string left;
     string right;
     for(int i=0;i<28;i++){
@@ -277,7 +314,7 @@ int main(){
 
 
 
-    //cout<<left;
+    // all 16 keys generated and stored
     for(int i=0;i<16;i++){
         left = shift_left(left,key_shift_in_each_round[i]);
         right =  shift_left(right,key_shift_in_each_round[i]);
@@ -290,10 +327,14 @@ int main(){
         hexa_keys.push_back(convertToHexadecimal(final_key));
 
     }
+    // encrypt plain text
     string cipher_text = encrypt(plain_text);
     cout<<"Cipher::\n"<<cipher_text<<"\n";
+    // reverse order of keys for decryption
     reverse(binary_keys.begin(), binary_keys.end());
     reverse(hexa_keys.begin(), hexa_keys.end());
+
+    // decrypt data
     string original_text = encrypt(cipher_text);
     cout<<"Plain Text::\n"<<original_text<<"\n";
     return 0;
